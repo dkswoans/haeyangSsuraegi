@@ -116,22 +116,40 @@ class EventController extends StateNotifier<EventState> {
     }
   }
 
-  void simulateEvent() {
-    final random = Random();
-    final cellId = random.nextInt(6);
+  void simulateEvent({int? row, int? col, int? cellId}) {
+    final resolved = _resolveCell(row: row, col: col, cellId: cellId);
     final now = DateTime.now();
     final simulated = TankEvent(
       id: 'sim_${const Uuid().v4().split('-').first}',
       timestamp: now,
-      row: cellId ~/ 3,
-      col: cellId % 3,
-      cellId: cellId,
+      row: resolved.row,
+      col: resolved.col,
+      cellId: resolved.cellId,
       imageUrl: 'assets/placeholder.png',
       isAsset: true,
     );
 
     final merged = _mergeEvents([simulated]);
     state = state.copyWith(events: merged, lastUpdated: now, error: null);
+  }
+
+  /// Utility for tests/demo: generate at a specific cell.
+  void simulateEventAt(int row, int col) => simulateEvent(row: row, col: col);
+
+  _ResolvedCell _resolveCell({int? row, int? col, int? cellId}) {
+    if (cellId != null) {
+      final r = cellId ~/ 3;
+      final c = cellId % 3;
+      return _ResolvedCell(row: r, col: c, cellId: cellId);
+    }
+    if (row != null && col != null) {
+      final cid = row * 3 + col;
+      return _ResolvedCell(row: row, col: col, cellId: cid);
+    }
+    // 기본: 0~5 랜덤 셀
+    final random = Random();
+    final cid = random.nextInt(6);
+    return _ResolvedCell(row: cid ~/ 3, col: cid % 3, cellId: cid);
   }
 
   void _seedDemoEvents() {
@@ -189,6 +207,18 @@ class EventController extends StateNotifier<EventState> {
     _stopPolling();
     super.dispose();
   }
+}
+
+class _ResolvedCell {
+  final int row;
+  final int col;
+  final int cellId;
+
+  const _ResolvedCell({
+    required this.row,
+    required this.col,
+    required this.cellId,
+  });
 }
 
 final eventControllerProvider =

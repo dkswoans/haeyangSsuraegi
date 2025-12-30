@@ -24,15 +24,16 @@ class TankEvent {
     final parsedCellId = rawCell is int
         ? rawCell
         : int.tryParse('$rawCell') ?? 0;
-    final rawRow = json['row'] ?? json['r'];
-    final rawCol = json['col'] ?? json['c'];
+    final rawRow = json['row'] ?? json['r'] ?? json['cell_row'];
+    final rawCol = json['col'] ?? json['c'] ?? json['cell_col'];
     final row = rawRow is int
         ? rawRow
         : int.tryParse('$rawRow') ?? parsedCellId ~/ 3;
     final col = rawCol is int
         ? rawCol
         : int.tryParse('$rawCol') ?? parsedCellId % 3;
-    final timestampRaw = json['timestamp'] as String? ?? '';
+    final timestampRaw =
+        json['timestamp'] as String? ?? json['created_at'] as String? ?? '';
     final timestamp =
         DateTime.tryParse(timestampRaw)?.toLocal() ?? DateTime.now();
 
@@ -41,8 +42,9 @@ class TankEvent {
       timestamp: timestamp,
       row: row,
       col: col,
-      cellId: parsedCellId,
-      imageUrl: json['image_url'] as String? ?? '',
+      cellId: parsedCellId != 0 ? parsedCellId : row * 3 + col,
+      imageUrl:
+          json['image_url'] as String? ?? json['imageUrl'] as String? ?? '',
     );
   }
 

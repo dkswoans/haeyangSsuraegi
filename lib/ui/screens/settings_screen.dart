@@ -15,6 +15,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _urlController;
   bool _userEdited = false;
+  late final TextEditingController _startController;
+  late final TextEditingController _endController;
+  late final TextEditingController _laneController;
 
   @override
   void initState() {
@@ -22,16 +25,30 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final initialUrl = ref.read(
       settingsControllerProvider.select((s) => s.serverUrl),
     );
+    final start = ref.read(settingsControllerProvider.select((s) => s.startCm));
+    final end = ref.read(settingsControllerProvider.select((s) => s.endCm));
+    final lane = ref.read(settingsControllerProvider.select((s) => s.laneCm));
     _urlController = TextEditingController(text: initialUrl);
+    _startController = TextEditingController(text: start.toString());
+    _endController = TextEditingController(text: end.toString());
+    _laneController = TextEditingController(text: lane.toString());
     ref.listen<SettingsState>(settingsControllerProvider, (previous, next) {
       if (!_userEdited && next.serverUrl != _urlController.text) {
         _urlController.text = next.serverUrl;
+      }
+      if (!_userEdited) {
+        _startController.text = next.startCm.toString();
+        _endController.text = next.endCm.toString();
+        _laneController.text = next.laneCm.toString();
       }
     });
   }
 
   @override
   void dispose() {
+    _startController.dispose();
+    _endController.dispose();
+    _laneController.dispose();
     _urlController.dispose();
     super.dispose();
   }
@@ -87,6 +104,53 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
               ),
               const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _startController,
+                      decoration: const InputDecoration(
+                        labelText: 'Start point (cm)',
+                        border: OutlineInputBorder(),
+                      ),
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      validator: _validateDouble,
+                      onChanged: (_) => _userEdited = true,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextFormField(
+                      controller: _endController,
+                      decoration: const InputDecoration(
+                        labelText: 'End point (cm)',
+                        border: OutlineInputBorder(),
+                      ),
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      validator: _validateDouble,
+                      onChanged: (_) => _userEdited = true,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _laneController,
+                decoration: const InputDecoration(
+                  labelText: 'Lane Y (cm, 0~20)',
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                validator: _validateDouble,
+                onChanged: (_) => _userEdited = true,
+              ),
+              const SizedBox(height: 12),
               ElevatedButton.icon(
                 icon: const Icon(Icons.save),
                 label: const Text('Save & Apply'),
@@ -103,7 +167,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               const SizedBox(height: 12),
               const Text(
                 'Note: The app will poll /api/events every 2 seconds when a URL is set. '
-                'Use the Simulate Event button on the dashboard for offline demos.',
+                'Use the dashboard controls for demo if no device is connected.',
               ),
             ],
           ),
@@ -112,11 +176,26 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
+  String? _validateDouble(String? value) {
+    final trimmed = value?.trim() ?? '';
+    if (trimmed.isEmpty) return 'Value required';
+    if (double.tryParse(trimmed) == null) return 'Enter a number';
+    return null;
+  }
+
   Future<void> _onSave() async {
     if (!_formKey.currentState!.validate()) return;
     final url = _urlController.text.trim();
+    final start = double.parse(_startController.text.trim());
+    final end = double.parse(_endController.text.trim());
+    final lane = double.parse(_laneController.text.trim());
     final settingsController = ref.read(settingsControllerProvider.notifier);
     await settingsController.updateServerUrl(url);
+    await settingsController.updateCalibration(
+      start: start,
+      end: end,
+      lane: lane,
+    );
     if (!mounted) return;
     _userEdited = false;
     ScaffoldMessenger.of(

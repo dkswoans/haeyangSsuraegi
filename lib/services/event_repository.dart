@@ -26,7 +26,7 @@ class EventRepository {
     };
 
     final uri = Uri.parse(
-      '$normalizedBase/api/events',
+      '$normalizedBase/records',
     ).replace(queryParameters: query);
 
     final response = await _client.get(uri);
@@ -39,9 +39,12 @@ class EventRepository {
       throw Exception('Unexpected response format from server.');
     }
 
-    return decoded
-        .map((e) => TankEvent.fromJson(e as Map<String, dynamic>))
-        .toList();
+    return decoded.map((e) {
+      final parsed = TankEvent.fromJson(e as Map<String, dynamic>);
+      return parsed.copyWith(
+        imageUrl: _resolveImageUrl(normalizedBase, parsed.imageUrl),
+      );
+    }).toList();
   }
 
   String _normalizeBaseUrl(String raw) {
@@ -50,6 +53,16 @@ class EventRepository {
       return trimmed.substring(0, trimmed.length - 1);
     }
     return trimmed;
+  }
+
+  String _resolveImageUrl(String base, String path) {
+    if (path.startsWith('http://') || path.startsWith('https://')) {
+      return path;
+    }
+    if (path.startsWith('/')) {
+      return '$base$path';
+    }
+    return '$base/$path';
   }
 
   void dispose() {
