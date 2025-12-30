@@ -8,7 +8,6 @@ import 'package:intl/intl.dart';
 import '../../models/photo_record.dart';
 import '../../state/photo_controller.dart';
 import 'history_screen.dart';
-import 'settings_screen.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -27,24 +26,64 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final formatter = DateFormat('MM/dd HH:mm');
 
     return Scaffold(
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(72),
+        child: AppBar(
+          toolbarHeight: 72,
+          elevation: 0,
+          automaticallyImplyLeading: false,
+          backgroundColor: Colors.transparent,
+          flexibleSpace: Container(
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFFE9F2FF), Color(0xFFDDE8FF)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x1A000000),
+                  blurRadius: 10,
+                  offset: Offset(0, 6),
+                ),
+              ],
+            ),
+          ),
+          titleSpacing: 16,
+          title: const Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                '수조 쓰레기 모니터',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF0B1633),
+                ),
+              ),
+              SizedBox(height: 4),
+              Text(
+                '수조 현황을 실시간으로 확인하세요',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFF5B6B84),
+                ),
+              ),
+            ],
+          ),
+          actions: const [],
+        ),
+      ),
       body: DecoratedBox(
         decoration: const BoxDecoration(color: Color(0xFFF5F7FB)),
         child: SafeArea(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
             child: Column(
               children: [
-                _DashboardHeader(
-                  onHistory: _openHistory,
-                  onSettings: _openSettings,
-                ),
-                const SizedBox(height: 10),
-                _MetricsRow(
-                  total: photos.length,
-                  latest: latest,
-                  formatter: formatter,
-                ),
-                const SizedBox(height: 14),
                 Expanded(
                   child: _TankSection(
                     items: photos,
@@ -53,13 +92,20 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     onSelect: (item) => _showPhotoModal(context, item),
                   ),
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 8),
+                _MetricsRow(
+                  total: photos.length,
+                  latest: latest,
+                  formatter: formatter,
+                ),
+                const SizedBox(height: 40),
                 _ActionRow(
                   onLatest: latest == null
                       ? null
                       : () => _showPhotoModal(context, latest),
                   onHistory: _openHistory,
                 ),
+                const SizedBox(height: 20),
               ],
             ),
           ),
@@ -74,12 +120,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     ).push(MaterialPageRoute(builder: (_) => const HistoryScreen()));
   }
 
-  void _openSettings() {
-    Navigator.of(
-      context,
-    ).push(MaterialPageRoute(builder: (_) => const SettingsScreen()));
-  }
-
   void _showPhotoModal(BuildContext context, PhotoRecord item) {
     showModalBottomSheet(
       context: context,
@@ -89,78 +129,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (_) => _PhotoModal(item: item),
-    );
-  }
-}
-
-class _DashboardHeader extends StatelessWidget {
-  const _DashboardHeader({required this.onHistory, required this.onSettings});
-
-  final VoidCallback onHistory;
-  final VoidCallback onSettings;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final titleStyle =
-        theme.textTheme.titleLarge ??
-        const TextStyle(fontSize: 20, fontWeight: FontWeight.w700);
-    final subtitleStyle =
-        theme.textTheme.bodySmall?.copyWith(color: const Color(0xFF64748B)) ??
-        const TextStyle(color: Color(0xFF64748B));
-
-    return Row(
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('수조 쓰레기 모니터', style: titleStyle),
-              const SizedBox(height: 4),
-              Text('수조 현황 한눈에 보기', style: subtitleStyle),
-            ],
-          ),
-        ),
-        _HeaderAction(icon: Icons.history, tooltip: '기록', onPressed: onHistory),
-        const SizedBox(width: 8),
-        _HeaderAction(icon: Icons.tune, tooltip: '설정', onPressed: onSettings),
-      ],
-    );
-  }
-}
-
-class _HeaderAction extends StatelessWidget {
-  const _HeaderAction({
-    required this.icon,
-    required this.tooltip,
-    required this.onPressed,
-  });
-
-  final IconData icon;
-  final String tooltip;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return Tooltip(
-      message: tooltip,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(12),
-          onTap: onPressed,
-          child: Ink(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
-            ),
-            child: Icon(icon, size: 20, color: const Color(0xFF0F172A)),
-          ),
-        ),
-      ),
     );
   }
 }
@@ -286,36 +254,40 @@ class _TankSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Text('수조 맵', style: titleStyle),
-            const Spacer(),
-            OutlinedButton.icon(
-              onPressed: onToggleGrid,
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 8,
-                ),
-                visualDensity: VisualDensity.compact,
-              ),
-              icon: Icon(showGrid ? Icons.grid_on : Icons.grid_off, size: 18),
-              label: Text(showGrid ? '격자 켜짐' : '격자 꺼짐'),
-            ),
-          ],
-        ),
+        Text('수조 맵', style: titleStyle),
         const SizedBox(height: 8),
         Expanded(
-          child: _TankCard(
-            child: Center(
-              child: TankViewport(
-                child: _TankMap(
-                  items: items,
-                  showGrid: showGrid,
-                  onSelect: onSelect,
+          child: Stack(
+            children: [
+              _TankCard(
+                child: Center(
+                  child: TankViewport(
+                    child: _TankMap(
+                      items: items,
+                      showGrid: showGrid,
+                      onSelect: onSelect,
+                    ),
+                  ),
                 ),
               ),
-            ),
+              Positioned(
+                top: 10,
+                right: 10,
+                child: OutlinedButton(
+                  onPressed: onToggleGrid,
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.all(10),
+                    minimumSize: const Size(42, 42),
+                    shape: const CircleBorder(),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  child: Icon(
+                    showGrid ? Icons.grid_on : Icons.grid_off,
+                    size: 18,
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ],
@@ -554,7 +526,7 @@ class _ActionRow extends StatelessWidget {
           child: OutlinedButton.icon(
             onPressed: onHistory,
             style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 14),
+              padding: const EdgeInsets.symmetric(vertical: 16),
               side: const BorderSide(color: Color(0xFFD5DEEB)),
             ),
             icon: const Icon(Icons.history),
@@ -566,7 +538,7 @@ class _ActionRow extends StatelessWidget {
           child: FilledButton.icon(
             onPressed: onLatest,
             style: FilledButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 14),
+              padding: const EdgeInsets.symmetric(vertical: 16),
               backgroundColor: const Color(0xFF2563EB),
               foregroundColor: Colors.white,
             ),
