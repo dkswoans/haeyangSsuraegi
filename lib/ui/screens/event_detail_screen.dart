@@ -12,34 +12,80 @@ class EventDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final formatter = DateFormat('yyyy-MM-dd HH:mm:ss');
+    final theme = Theme.of(context);
+
     return Scaffold(
       appBar: AppBar(title: const Text('Event Detail')),
       body: SafeArea(
-        child: SingleChildScrollView(
+        child: ListView(
           padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _EventImage(event: event),
-              const SizedBox(height: 16),
-              Text('Event ID', style: Theme.of(context).textTheme.labelMedium),
-              Text(event.id, style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: 12),
-              Text('Timestamp', style: Theme.of(context).textTheme.labelMedium),
-              Text(
-                formatter.format(event.timestamp),
-                style: Theme.of(context).textTheme.titleMedium,
+          children: [
+            _EventImage(event: event),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: _panelDecoration(),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Event Details',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  _DetailRow(label: 'Event ID', value: event.id),
+                  const Divider(height: 20),
+                  _DetailRow(
+                    label: 'Timestamp',
+                    value: formatter.format(event.timestamp),
+                  ),
+                  const Divider(height: 20),
+                  _DetailRow(
+                    label: 'Location',
+                    value:
+                        'Row ${event.row}, Col ${event.col} | Cell ${TankEvent.cellLabel(event.cellId)}',
+                  ),
+                ],
               ),
-              const SizedBox(height: 12),
-              Text('Location', style: Theme.of(context).textTheme.labelMedium),
-              Text(
-                'Row ${event.row}, Col ${event.col}  •  Cell ${TankEvent.cellLabel(event.cellId)}',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
+    );
+  }
+}
+
+class _DetailRow extends StatelessWidget {
+  const _DetailRow({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 96,
+          child: Text(
+            label,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: const Color(0xFF64748B),
+                ),
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -94,4 +140,19 @@ class _EventImage extends StatelessWidget {
       ),
     );
   }
+}
+
+BoxDecoration _panelDecoration([double radius = 16]) {
+  return BoxDecoration(
+    color: Colors.white,
+    borderRadius: BorderRadius.circular(radius),
+    border: Border.all(color: const Color(0xFFE2E8F0)),
+    boxShadow: const [
+      BoxShadow(
+        color: Color(0x14000000),
+        blurRadius: 12,
+        offset: Offset(0, 6),
+      ),
+    ],
+  );
 }

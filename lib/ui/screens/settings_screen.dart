@@ -61,33 +61,23 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+        child: Form(
+          key: _formKey,
+          child: ListView(
+            padding: const EdgeInsets.all(16),
             children: [
-              Chip(
-                backgroundColor: events.isConnected
-                    ? const Color(0xFFD1FAE5)
-                    : const Color(0xFFFFE4E6),
-                label: Text(
-                  events.isConnected ? 'Connected' : 'Disconnected',
-                  style: TextStyle(
-                    color: events.isConnected
-                        ? const Color(0xFF065F46)
-                        : Colors.red,
-                  ),
-                ),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: _StatusBanner(isConnected: events.isConnected),
               ),
               const SizedBox(height: 12),
-              Form(
-                key: _formKey,
+              _SectionCard(
+                title: 'Server',
                 child: TextFormField(
                   controller: _urlController,
                   decoration: const InputDecoration(
                     labelText: 'Raspberry Pi base URL',
                     hintText: 'http://192.168.0.20:8000',
-                    border: OutlineInputBorder(),
                   ),
                   onChanged: (_) => _userEdited = true,
                   validator: (value) {
@@ -104,14 +94,46 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
               ),
               const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextFormField(
-                      controller: _startController,
+              _SectionCard(
+                title: 'Calibration',
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextFormField(
+                            controller: _startController,
+                            decoration: const InputDecoration(
+                              labelText: 'Start point (cm)',
+                            ),
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
+                            validator: _validateDouble,
+                            onChanged: (_) => _userEdited = true,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextFormField(
+                            controller: _endController,
+                            decoration: const InputDecoration(
+                              labelText: 'End point (cm)',
+                            ),
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
+                            validator: _validateDouble,
+                            onChanged: (_) => _userEdited = true,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: _laneController,
                       decoration: const InputDecoration(
-                        labelText: 'Start point (cm)',
-                        border: OutlineInputBorder(),
+                        labelText: 'Lane Y (cm, 0~20)',
                       ),
                       keyboardType: const TextInputType.numberWithOptions(
                         decimal: true,
@@ -119,55 +141,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       validator: _validateDouble,
                       onChanged: (_) => _userEdited = true,
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: TextFormField(
-                      controller: _endController,
-                      decoration: const InputDecoration(
-                        labelText: 'End point (cm)',
-                        border: OutlineInputBorder(),
-                      ),
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      validator: _validateDouble,
-                      onChanged: (_) => _userEdited = true,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _laneController,
-                decoration: const InputDecoration(
-                  labelText: 'Lane Y (cm, 0~20)',
-                  border: OutlineInputBorder(),
+                  ],
                 ),
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                validator: _validateDouble,
-                onChanged: (_) => _userEdited = true,
               ),
               const SizedBox(height: 12),
               ElevatedButton.icon(
                 icon: const Icon(Icons.save),
                 label: const Text('Save & Apply'),
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  backgroundColor: const Color(0xFF0EA5E9),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
                 onPressed: settings.isLoaded ? _onSave : null,
               ),
               const SizedBox(height: 12),
-              const Text(
-                'Note: The app will poll /api/events every 2 seconds when a URL is set. '
-                'Use the dashboard controls for demo if no device is connected.',
+              const _NoteCard(
+                text:
+                    'Note: The app will poll /api/events every 2 seconds when a URL is set. '
+                    'Use the dashboard controls for demo if no device is connected.',
               ),
             ],
           ),
@@ -198,8 +185,118 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
     if (!mounted) return;
     _userEdited = false;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Server URL saved.')));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Server URL saved.')),
+    );
   }
+}
+
+class _StatusBanner extends StatelessWidget {
+  const _StatusBanner({required this.isConnected});
+
+  final bool isConnected;
+
+  @override
+  Widget build(BuildContext context) {
+    final background = isConnected
+        ? const Color(0xFFD1FAE5)
+        : const Color(0xFFFEE2E2);
+    final border = isConnected
+        ? const Color(0xFFA7F3D0)
+        : const Color(0xFFFECACA);
+    final textColor = isConnected
+        ? const Color(0xFF065F46)
+        : const Color(0xFFB91C1C);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: border),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(isConnected ? Icons.wifi : Icons.wifi_off, color: textColor),
+          const SizedBox(width: 8),
+          Text(
+            isConnected ? 'Connected' : 'Disconnected',
+            style: TextStyle(color: textColor, fontWeight: FontWeight.w600),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SectionCard extends StatelessWidget {
+  const _SectionCard({required this.title, required this.child});
+
+  final String title;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final titleStyle = Theme.of(context).textTheme.titleMedium?.copyWith(
+          fontWeight: FontWeight.w700,
+        );
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: _panelDecoration(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: titleStyle),
+          const SizedBox(height: 12),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+class _NoteCard extends StatelessWidget {
+  const _NoteCard({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: _panelDecoration(),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.info_outline, color: Color(0xFF64748B)),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: const Color(0xFF64748B),
+                  ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+BoxDecoration _panelDecoration([double radius = 16]) {
+  return BoxDecoration(
+    color: Colors.white,
+    borderRadius: BorderRadius.circular(radius),
+    border: Border.all(color: const Color(0xFFE2E8F0)),
+    boxShadow: const [
+      BoxShadow(
+        color: Color(0x14000000),
+        blurRadius: 12,
+        offset: Offset(0, 6),
+      ),
+    ],
+  );
 }

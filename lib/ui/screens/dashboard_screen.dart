@@ -1,11 +1,14 @@
 import 'dart:ui' show lerpDouble, Offset;
+import 'dart:ui' as ui show TextDirection;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
 import '../../models/photo_record.dart';
 import '../../state/photo_controller.dart';
 import 'history_screen.dart';
+import 'settings_screen.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -21,78 +24,49 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   Widget build(BuildContext context) {
     final photos = ref.watch(photoControllerProvider).items;
     final latest = ref.read(photoControllerProvider.notifier).latest();
+    final formatter = DateFormat('MM/dd HH:mm');
 
     return Scaffold(
-      extendBodyBehindAppBar: true,
-      appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(46),
-        child: AppBar(
-          backgroundColor: Colors.black.withValues(alpha: 0.08),
-          elevation: 0,
-          titleSpacing: 12,
-          title: const Text(
-            'Marine Trash Monitor',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-          ),
-          actions: [
-            IconButton(
-              tooltip: 'History',
-              icon: const Icon(Icons.history),
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const HistoryScreen()),
-                );
-              },
-            ),
-            IconButton(
-              tooltip: showGrid ? 'Hide grid' : 'Show grid',
-              icon: Icon(showGrid ? Icons.grid_off : Icons.grid_on),
-              onPressed: () => setState(() => showGrid = !showGrid),
-            ),
-            const SizedBox(width: 8),
-          ],
-        ),
-      ),
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFFE8F1FA), Color(0xFFF8FAFC)],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-          ),
-        ),
+      body: DecoratedBox(
+        decoration: const BoxDecoration(color: Color(0xFFF5F7FB)),
         child: SafeArea(
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
             child: Column(
               children: [
+                _DashboardHeader(
+                  onHistory: _openHistory,
+                  onSettings: _openSettings,
+                ),
+                const SizedBox(height: 10),
+                _MetricsRow(
+                  total: photos.length,
+                  latest: latest,
+                  formatter: formatter,
+                ),
+                const SizedBox(height: 14),
                 Expanded(
-                  child: Center(
-                    child: TankViewport(
-                      child: _TankCard(
-                        child: _TankMap(
-                          items: photos,
-                          showGrid: showGrid,
-                          onSelect: (item) => _showPhotoModal(context, item),
-                        ),
-                      ),
-                    ),
+                  child: _TankSection(
+                    items: photos,
+                    showGrid: showGrid,
+                    onToggleGrid: () => setState(() => showGrid = !showGrid),
+                    onSelect: (item) => _showPhotoModal(context, item),
                   ),
                 ),
-                const SizedBox(height: 16),
-                _InfoBar(total: photos.length, latest: latest),
                 const SizedBox(height: 14),
-                _PrimaryButton(
-                  label: 'Show Latest Photo',
-                  onPressed: latest == null
+                _LatestCard(
+                  latest: latest,
+                  formatter: formatter,
+                  onOpen: latest == null
                       ? null
                       : () => _showPhotoModal(context, latest),
                 ),
-                SizedBox(
-                  height: (MediaQuery.of(context).size.height * 0.07).clamp(
-                    28.0,
-                    72.0,
-                  ),
+                const SizedBox(height: 12),
+                _ActionRow(
+                  onLatest: latest == null
+                      ? null
+                      : () => _showPhotoModal(context, latest),
+                  onHistory: _openHistory,
                 ),
               ],
             ),
@@ -102,14 +76,265 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     );
   }
 
+  void _openHistory() {
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const HistoryScreen()));
+  }
+
+  void _openSettings() {
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const SettingsScreen()));
+  }
+
   void _showPhotoModal(BuildContext context, PhotoRecord item) {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (_) => _PhotoModal(item: item),
+    );
+  }
+}
+
+class _DashboardHeader extends StatelessWidget {
+  const _DashboardHeader({required this.onHistory, required this.onSettings});
+
+  final VoidCallback onHistory;
+  final VoidCallback onSettings;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final titleStyle =
+        theme.textTheme.titleLarge ??
+        const TextStyle(fontSize: 20, fontWeight: FontWeight.w700);
+    final subtitleStyle =
+        theme.textTheme.bodySmall?.copyWith(color: const Color(0xFF64748B)) ??
+        const TextStyle(color: Color(0xFF64748B));
+
+    return Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Marine Trash Monitor', style: titleStyle),
+              const SizedBox(height: 4),
+              Text('Live tank overview', style: subtitleStyle),
+            ],
+          ),
+        ),
+        _HeaderAction(
+          icon: Icons.history,
+          tooltip: 'History',
+          onPressed: onHistory,
+        ),
+        const SizedBox(width: 8),
+        _HeaderAction(
+          icon: Icons.tune,
+          tooltip: 'Settings',
+          onPressed: onSettings,
+        ),
+      ],
+    );
+  }
+}
+
+class _HeaderAction extends StatelessWidget {
+  const _HeaderAction({
+    required this.icon,
+    required this.tooltip,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: onPressed,
+          child: Ink(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Icon(icon, size: 20, color: const Color(0xFF0F172A)),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MetricsRow extends StatelessWidget {
+  const _MetricsRow({
+    required this.total,
+    required this.latest,
+    required this.formatter,
+  });
+
+  final int total;
+  final PhotoRecord? latest;
+  final DateFormat formatter;
+
+  @override
+  Widget build(BuildContext context) {
+    final latestText = latest == null
+        ? 'No data'
+        : formatter.format(latest!.createdAt.toLocal());
+    return Row(
+      children: [
+        Expanded(
+          child: _MetricCard(
+            label: 'Detections',
+            value: '$total',
+            icon: Icons.blur_on_rounded,
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: _MetricCard(
+            label: 'Latest',
+            value: latestText,
+            icon: Icons.access_time,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _MetricCard extends StatelessWidget {
+  const _MetricCard({
+    required this.label,
+    required this.value,
+    required this.icon,
+  });
+
+  final String label;
+  final String value;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final labelStyle =
+        theme.textTheme.bodySmall?.copyWith(color: const Color(0xFF64748B)) ??
+        const TextStyle(color: Color(0xFF64748B), fontSize: 12);
+    final valueStyle =
+        theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700) ??
+        const TextStyle(fontWeight: FontWeight.w700);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: _panelDecoration(14).copyWith(
+        color: Colors.white,
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0F000000),
+            blurRadius: 12,
+            offset: Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: const Color(0xFFEFF6FF),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, size: 18, color: const Color(0xFF1D4ED8)),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: labelStyle),
+                const SizedBox(height: 2),
+                Text(value, style: valueStyle),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TankSection extends StatelessWidget {
+  const _TankSection({
+    required this.items,
+    required this.showGrid,
+    required this.onToggleGrid,
+    required this.onSelect,
+  });
+
+  final List<PhotoRecord> items;
+  final bool showGrid;
+  final VoidCallback onToggleGrid;
+  final ValueChanged<PhotoRecord> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final titleStyle = Theme.of(
+      context,
+    ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text('Tank Map', style: titleStyle),
+            const Spacer(),
+            OutlinedButton.icon(
+              onPressed: onToggleGrid,
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 8,
+                ),
+                visualDensity: VisualDensity.compact,
+              ),
+              icon: Icon(showGrid ? Icons.grid_on : Icons.grid_off, size: 18),
+              label: Text(showGrid ? 'Grid on' : 'Grid off'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Expanded(
+          child: _TankCard(
+            child: Center(
+              child: TankViewport(
+                child: _TankMap(
+                  items: items,
+                  showGrid: showGrid,
+                  onSelect: onSelect,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -121,13 +346,12 @@ class _TankCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DecoratedBox(
-      decoration: BoxDecoration(
+      decoration: _panelDecoration(18).copyWith(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
         boxShadow: const [
           BoxShadow(
-            color: Color(0x22000000),
-            blurRadius: 12,
+            color: Color(0x0F000000),
+            blurRadius: 14,
             offset: Offset(0, 8),
           ),
         ],
@@ -147,10 +371,18 @@ class TankViewport extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final h = MediaQuery.of(context).size.height;
-    return ConstrainedBox(
-      constraints: BoxConstraints(minHeight: 150, maxHeight: h * 0.36),
-      child: AspectRatio(aspectRatio: 3.0, child: child),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final maxWidth = constraints.maxWidth;
+        final maxHeight = constraints.maxHeight;
+        var width = maxWidth;
+        var height = width / 3;
+        if (height > maxHeight) {
+          height = maxHeight;
+          width = height * 3;
+        }
+        return SizedBox(width: width, height: height, child: child);
+      },
     );
   }
 }
@@ -214,10 +446,10 @@ class _TankPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final rect = Rect.fromLTWH(0, 0, size.width, size.height);
-    final base = Paint()..color = const Color(0xFFEFF4FA);
+    final base = Paint()..color = const Color(0xFFF1F5F9);
     final border = Paint()
-      ..color = const Color(0xFF0F172A)
-      ..strokeWidth = 3
+      ..color = const Color(0xFF1E293B)
+      ..strokeWidth = 2
       ..style = PaintingStyle.stroke;
 
     canvas.drawRect(rect, base);
@@ -242,7 +474,7 @@ class _TankPainter extends CustomPainter {
     final labelStyle = const TextStyle(color: Color(0xFF94A3B8), fontSize: 10);
     TextPainter tp(String text) => TextPainter(
       text: TextSpan(text: text, style: labelStyle),
-      textDirection: TextDirection.ltr,
+      textDirection: ui.TextDirection.ltr,
     )..layout();
     tp('0,0').paint(canvas, const Offset(6, 4));
     final topRight = tp('$cols,0');
@@ -265,10 +497,10 @@ class _TankPainter extends CustomPainter {
     for (final item in items) {
       final x = ((item.cellCol + 0.5) / cols) * size.width;
       final y = ((item.cellRow + 0.5) / rows) * size.height;
-      final conf = 0.7;
+      const conf = 0.7;
       final radius = (lerpDouble(minSize, maxSize, conf) ?? minSize) / 2;
       final paint = Paint()
-        ..color = const Color(0xFF2563EB).withValues(alpha: 0.7)
+        ..color = const Color(0xFF2563EB).withValues(alpha: 0.8)
         ..style = PaintingStyle.fill;
       final outline = Paint()
         ..color = Colors.white.withValues(alpha: 0.9)
@@ -324,95 +556,156 @@ class _TapRegion extends StatelessWidget {
   }
 }
 
-class _InfoBar extends StatelessWidget {
-  const _InfoBar({required this.total, required this.latest});
+class _LatestCard extends StatelessWidget {
+  const _LatestCard({
+    required this.latest,
+    required this.formatter,
+    required this.onOpen,
+  });
 
-  final int total;
   final PhotoRecord? latest;
+  final DateFormat formatter;
+  final VoidCallback? onOpen;
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    if (latest == null) {
+      return Container(
+        decoration: _panelDecoration(),
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          children: [
+            Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                color: const Color(0xFFE2E8F0),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.photo, color: Color(0xFF94A3B8)),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'No detections yet. New uploads will show here.',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: const Color(0xFF64748B),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final timeText = formatter.format(latest!.createdAt.toLocal());
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+      decoration: _panelDecoration(14).copyWith(
         boxShadow: const [
           BoxShadow(
-            color: Color(0x16000000),
-            blurRadius: 8,
-            offset: Offset(0, 3),
+            color: Color(0x0F000000),
+            blurRadius: 12,
+            offset: Offset(0, 6),
           ),
         ],
       ),
+      padding: const EdgeInsets.all(14),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          _InfoChip(label: 'Detected', value: '$total'),
-          const SizedBox(width: 8),
-          _InfoChip(
-            label: 'Latest',
-            value: latest == null
-                ? 'None'
-                : '#${latest!.id} • ${latest!.createdAt.toLocal().toIso8601String().substring(11, 19)}',
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _InfoChip extends StatelessWidget {
-  const _InfoChip({required this.label, required this.value});
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11),
-          ),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.w700)),
-        ],
-      ),
-    );
-  }
-}
-
-class _PrimaryButton extends StatelessWidget {
-  const _PrimaryButton({required this.label, required this.onPressed});
-
-  final String label;
-  final VoidCallback? onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      child: ElevatedButton(
-        onPressed: onPressed,
-        style: ElevatedButton.styleFrom(
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          backgroundColor: const Color(0xFF2563EB),
-          foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(
+          ClipRRect(
             borderRadius: BorderRadius.circular(12),
+            child: latest!.imageUrl.startsWith('http')
+                ? Image.network(
+                    latest!.imageUrl,
+                    width: 72,
+                    height: 72,
+                    fit: BoxFit.cover,
+                  )
+                : Image.asset(
+                    latest!.imageUrl,
+                    width: 72,
+                    height: 72,
+                    fit: BoxFit.cover,
+                  ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Latest detection',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: const Color(0xFF64748B),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'ID ${latest!.id} | Cell ${latest!.cellRow}, ${latest!.cellCol}',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  timeText,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: const Color(0xFF64748B),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          TextButton.icon(
+            onPressed: onOpen,
+            icon: const Icon(Icons.open_in_new),
+            label: const Text('Open'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ActionRow extends StatelessWidget {
+  const _ActionRow({required this.onLatest, required this.onHistory});
+
+  final VoidCallback? onLatest;
+  final VoidCallback onHistory;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: OutlinedButton.icon(
+            onPressed: onHistory,
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              side: const BorderSide(color: Color(0xFFD5DEEB)),
+            ),
+            icon: const Icon(Icons.history),
+            label: const Text('History'),
           ),
         ),
-        child: Text(label),
-      ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: FilledButton.icon(
+            onPressed: onLatest,
+            style: FilledButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              backgroundColor: const Color(0xFF2563EB),
+              foregroundColor: Colors.white,
+            ),
+            icon: const Icon(Icons.photo_outlined),
+            label: const Text('Latest Photo'),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -423,43 +716,123 @@ class _PhotoModal extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final formatter = DateFormat('yyyy-MM-dd HH:mm:ss');
+    final theme = Theme.of(context);
+
     return Padding(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'Photo Preview',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: const Color(0xFFE2E8F0),
+                borderRadius: BorderRadius.circular(999),
               ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Text(
+                'Photo detail',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const Spacer(),
               IconButton(
                 icon: const Icon(Icons.close),
                 onPressed: () => Navigator.pop(context),
               ),
             ],
           ),
-          const SizedBox(height: 12),
           ClipRRect(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(16),
             child: item.imageUrl.startsWith('http')
-                ? Image.network(item.imageUrl, height: 200, fit: BoxFit.cover)
-                : Image.asset(item.imageUrl, height: 200, fit: BoxFit.cover),
+                ? Image.network(
+                    item.imageUrl,
+                    height: 220,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                  )
+                : Image.asset(
+                    item.imageUrl,
+                    height: 220,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                  ),
           ),
           const SizedBox(height: 12),
-          Text('ID: ${item.id}'),
-          Text('Cell: (${item.cellRow}, ${item.cellCol})'),
-          Text('Created: ${item.createdAt.toLocal()}'),
-          const SizedBox(height: 8),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _DetailChip(label: 'ID', value: '#${item.id}'),
+              _DetailChip(
+                label: 'Cell',
+                value: '${item.cellRow}, ${item.cellCol}',
+              ),
+              _DetailChip(
+                label: 'Time',
+                value: formatter.format(item.createdAt.toLocal()),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Close'),
+            ),
           ),
         ],
       ),
     );
   }
+}
+
+class _DetailChip extends StatelessWidget {
+  const _DetailChip({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(color: Color(0xFF64748B), fontSize: 11),
+          ),
+          Text(value, style: const TextStyle(fontWeight: FontWeight.w600)),
+        ],
+      ),
+    );
+  }
+}
+
+BoxDecoration _panelDecoration([double radius = 16]) {
+  return BoxDecoration(
+    color: Colors.white,
+    borderRadius: BorderRadius.circular(radius),
+    border: Border.all(color: const Color(0xFFDCE5F1)),
+    boxShadow: const [
+      BoxShadow(color: Color(0x0C000000), blurRadius: 10, offset: Offset(0, 5)),
+    ],
+  );
 }
