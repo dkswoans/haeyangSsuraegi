@@ -66,20 +66,16 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             padding: const EdgeInsets.all(16),
             child: Column(
               children: [
-                Expanded(
-                  flex: 4,
+                TankResponsive(
                   child: _TankCard(
-                    child: AspectRatio(
-                      aspectRatio: 3 / 1,
-                      child: _TankMap(
-                        items: photos,
-                        showGrid: showGrid,
-                        onSelect: (item) => _showPhotoModal(context, item),
-                      ),
+                    child: _TankMap(
+                      items: photos,
+                      showGrid: showGrid,
+                      onSelect: (item) => _showPhotoModal(context, item),
                     ),
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 16),
                 _InfoBar(total: photos.length, latest: latest),
                 const SizedBox(height: 12),
                 _PrimaryButton(
@@ -130,6 +126,35 @@ class _TankCard extends StatelessWidget {
         padding: const EdgeInsets.all(12),
         child: ClipRRect(borderRadius: BorderRadius.circular(12), child: child),
       ),
+    );
+  }
+}
+
+class TankResponsive extends StatelessWidget {
+  const TankResponsive({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final maxWidth = constraints.maxWidth * 0.9;
+        final byAspectHeight = maxWidth / 3.0;
+        final byScreen = constraints.maxHeight * 0.5;
+        final height = (byAspectHeight).clamp(
+          140.0,
+          byScreen.clamp(160.0, 240.0),
+        );
+        final width = (height * 3).clamp(0.0, maxWidth);
+        return Center(
+          child: SizedBox(
+            width: width,
+            height: height,
+            child: AspectRatio(aspectRatio: 3.0, child: child),
+          ),
+        );
+      },
     );
   }
 }
