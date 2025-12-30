@@ -66,23 +66,33 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             padding: const EdgeInsets.all(16),
             child: Column(
               children: [
-                TankResponsive(
-                  child: _TankCard(
-                    child: _TankMap(
-                      items: photos,
-                      showGrid: showGrid,
-                      onSelect: (item) => _showPhotoModal(context, item),
+                Expanded(
+                  child: Center(
+                    child: TankViewport(
+                      child: _TankCard(
+                        child: _TankMap(
+                          items: photos,
+                          showGrid: showGrid,
+                          onSelect: (item) => _showPhotoModal(context, item),
+                        ),
+                      ),
                     ),
                   ),
                 ),
                 const SizedBox(height: 16),
                 _InfoBar(total: photos.length, latest: latest),
-                const SizedBox(height: 12),
+                const SizedBox(height: 14),
                 _PrimaryButton(
                   label: 'Show Latest Photo',
                   onPressed: latest == null
                       ? null
                       : () => _showPhotoModal(context, latest),
+                ),
+                SizedBox(
+                  height: (MediaQuery.of(context).size.height * 0.07).clamp(
+                    28.0,
+                    72.0,
+                  ),
                 ),
               ],
             ),
@@ -130,31 +140,17 @@ class _TankCard extends StatelessWidget {
   }
 }
 
-class TankResponsive extends StatelessWidget {
-  const TankResponsive({super.key, required this.child});
+class TankViewport extends StatelessWidget {
+  const TankViewport({super.key, required this.child});
 
   final Widget child;
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final maxWidth = constraints.maxWidth * 0.9;
-        final byAspectHeight = maxWidth / 3.0;
-        final byScreen = constraints.maxHeight * 0.5;
-        final height = (byAspectHeight).clamp(
-          140.0,
-          byScreen.clamp(160.0, 240.0),
-        );
-        final width = (height * 3).clamp(0.0, maxWidth);
-        return Center(
-          child: SizedBox(
-            width: width,
-            height: height,
-            child: AspectRatio(aspectRatio: 3.0, child: child),
-          ),
-        );
-      },
+    final h = MediaQuery.of(context).size.height;
+    return ConstrainedBox(
+      constraints: BoxConstraints(minHeight: 150, maxHeight: h * 0.36),
+      child: AspectRatio(aspectRatio: 3.0, child: child),
     );
   }
 }
@@ -351,6 +347,7 @@ class _InfoBar extends StatelessWidget {
         ],
       ),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
           _InfoChip(label: 'Detected', value: '$total'),
           const SizedBox(width: 8),
@@ -360,31 +357,8 @@ class _InfoBar extends StatelessWidget {
                 ? 'None'
                 : '#${latest!.id} • ${latest!.createdAt.toLocal().toIso8601String().substring(11, 19)}',
           ),
-          const Spacer(),
-          _Legend(),
         ],
       ),
-    );
-  }
-}
-
-class _Legend extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Container(
-          width: 10,
-          height: 10,
-          decoration: BoxDecoration(
-            color: const Color(0xFF2563EB),
-            borderRadius: BorderRadius.circular(5),
-            border: Border.all(color: Colors.white, width: 1.2),
-          ),
-        ),
-        const SizedBox(width: 6),
-        const Text('Detection', style: TextStyle(color: Color(0xFF475569))),
-      ],
     );
   }
 }
