@@ -84,6 +84,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
             child: Column(
               children: [
+                const SizedBox(height: 10),
+                _MetricsRow(
+                  total: photos.length,
+                  latest: latest,
+                  formatter: formatter,
+                ),
+                const SizedBox(height: 4),
                 Expanded(
                   child: _TankSection(
                     items: photos,
@@ -92,13 +99,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     onSelect: (item) => _showPhotoModal(context, item),
                   ),
                 ),
-                const SizedBox(height: 8),
-                _MetricsRow(
-                  total: photos.length,
-                  latest: latest,
-                  formatter: formatter,
-                ),
-                const SizedBox(height: 40),
+                const SizedBox(height: 20),
+
                 _ActionRow(
                   onLatest: latest == null
                       ? null
@@ -254,7 +256,6 @@ class _TankSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('수조 맵', style: titleStyle),
         const SizedBox(height: 8),
         Expanded(
           child: Stack(
@@ -526,7 +527,7 @@ class _ActionRow extends StatelessWidget {
           child: OutlinedButton.icon(
             onPressed: onHistory,
             style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 16),
+              padding: const EdgeInsets.symmetric(vertical: 18),
               side: const BorderSide(color: Color(0xFFD5DEEB)),
             ),
             icon: const Icon(Icons.history),
