@@ -54,14 +54,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   ),
                 ),
                 const SizedBox(height: 14),
-                _LatestCard(
-                  latest: latest,
-                  formatter: formatter,
-                  onOpen: latest == null
-                      ? null
-                      : () => _showPhotoModal(context, latest),
-                ),
-                const SizedBox(height: 12),
                 _ActionRow(
                   onLatest: latest == null
                       ? null
@@ -123,23 +115,15 @@ class _DashboardHeader extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Marine Trash Monitor', style: titleStyle),
+              Text('수조 쓰레기 모니터', style: titleStyle),
               const SizedBox(height: 4),
-              Text('Live tank overview', style: subtitleStyle),
+              Text('수조 현황 한눈에 보기', style: subtitleStyle),
             ],
           ),
         ),
-        _HeaderAction(
-          icon: Icons.history,
-          tooltip: 'History',
-          onPressed: onHistory,
-        ),
+        _HeaderAction(icon: Icons.history, tooltip: '기록', onPressed: onHistory),
         const SizedBox(width: 8),
-        _HeaderAction(
-          icon: Icons.tune,
-          tooltip: 'Settings',
-          onPressed: onSettings,
-        ),
+        _HeaderAction(icon: Icons.tune, tooltip: '설정', onPressed: onSettings),
       ],
     );
   }
@@ -195,13 +179,13 @@ class _MetricsRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final latestText = latest == null
-        ? 'No data'
+        ? '데이터 없음'
         : formatter.format(latest!.createdAt.toLocal());
     return Row(
       children: [
         Expanded(
           child: _MetricCard(
-            label: 'Detections',
+            label: '감지 수',
             value: '$total',
             icon: Icons.blur_on_rounded,
           ),
@@ -209,7 +193,7 @@ class _MetricsRow extends StatelessWidget {
         const SizedBox(width: 10),
         Expanded(
           child: _MetricCard(
-            label: 'Latest',
+            label: '최근 기록',
             value: latestText,
             icon: Icons.access_time,
           ),
@@ -304,7 +288,7 @@ class _TankSection extends StatelessWidget {
       children: [
         Row(
           children: [
-            Text('Tank Map', style: titleStyle),
+            Text('수조 맵', style: titleStyle),
             const Spacer(),
             OutlinedButton.icon(
               onPressed: onToggleGrid,
@@ -316,7 +300,7 @@ class _TankSection extends StatelessWidget {
                 visualDensity: VisualDensity.compact,
               ),
               icon: Icon(showGrid ? Icons.grid_on : Icons.grid_off, size: 18),
-              label: Text(showGrid ? 'Grid on' : 'Grid off'),
+              label: Text(showGrid ? '격자 켜짐' : '격자 꺼짐'),
             ),
           ],
         ),
@@ -556,121 +540,6 @@ class _TapRegion extends StatelessWidget {
   }
 }
 
-class _LatestCard extends StatelessWidget {
-  const _LatestCard({
-    required this.latest,
-    required this.formatter,
-    required this.onOpen,
-  });
-
-  final PhotoRecord? latest;
-  final DateFormat formatter;
-  final VoidCallback? onOpen;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    if (latest == null) {
-      return Container(
-        decoration: _panelDecoration(),
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          children: [
-            Container(
-              width: 52,
-              height: 52,
-              decoration: BoxDecoration(
-                color: const Color(0xFFE2E8F0),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(Icons.photo, color: Color(0xFF94A3B8)),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                'No detections yet. New uploads will show here.',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: const Color(0xFF64748B),
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    final timeText = formatter.format(latest!.createdAt.toLocal());
-
-    return Container(
-      decoration: _panelDecoration(14).copyWith(
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x0F000000),
-            blurRadius: 12,
-            offset: Offset(0, 6),
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.all(14),
-      child: Row(
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: latest!.imageUrl.startsWith('http')
-                ? Image.network(
-                    latest!.imageUrl,
-                    width: 72,
-                    height: 72,
-                    fit: BoxFit.cover,
-                  )
-                : Image.asset(
-                    latest!.imageUrl,
-                    width: 72,
-                    height: 72,
-                    fit: BoxFit.cover,
-                  ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Latest detection',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: const Color(0xFF64748B),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'ID ${latest!.id} | Cell ${latest!.cellRow}, ${latest!.cellCol}',
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  timeText,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: const Color(0xFF64748B),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          TextButton.icon(
-            onPressed: onOpen,
-            icon: const Icon(Icons.open_in_new),
-            label: const Text('Open'),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _ActionRow extends StatelessWidget {
   const _ActionRow({required this.onLatest, required this.onHistory});
 
@@ -689,7 +558,7 @@ class _ActionRow extends StatelessWidget {
               side: const BorderSide(color: Color(0xFFD5DEEB)),
             ),
             icon: const Icon(Icons.history),
-            label: const Text('History'),
+            label: const Text('기록 보기'),
           ),
         ),
         const SizedBox(width: 12),
@@ -702,7 +571,7 @@ class _ActionRow extends StatelessWidget {
               foregroundColor: Colors.white,
             ),
             icon: const Icon(Icons.photo_outlined),
-            label: const Text('Latest Photo'),
+            label: const Text('최근 사진'),
           ),
         ),
       ],
@@ -739,7 +608,7 @@ class _PhotoModal extends StatelessWidget {
           Row(
             children: [
               Text(
-                'Photo detail',
+                '사진 상세',
                 style: theme.textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w700,
                 ),
@@ -774,11 +643,11 @@ class _PhotoModal extends StatelessWidget {
             children: [
               _DetailChip(label: 'ID', value: '#${item.id}'),
               _DetailChip(
-                label: 'Cell',
+                label: '셀 위치',
                 value: '${item.cellRow}, ${item.cellCol}',
               ),
               _DetailChip(
-                label: 'Time',
+                label: '시간',
                 value: formatter.format(item.createdAt.toLocal()),
               ),
             ],
@@ -788,7 +657,7 @@ class _PhotoModal extends StatelessWidget {
             width: double.infinity,
             child: ElevatedButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Close'),
+              child: const Text('닫기'),
             ),
           ),
         ],

@@ -18,7 +18,7 @@ class MyApp extends ConsumerWidget {
     );
 
     return MaterialApp(
-      title: 'Tank Monitor',
+      title: '수조 모니터',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: colorScheme,
