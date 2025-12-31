@@ -70,6 +70,7 @@ class HistoryScreen extends ConsumerWidget {
   void _showModal(BuildContext context, Photo item, String imageUrl) {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
