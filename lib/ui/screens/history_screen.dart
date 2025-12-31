@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
-import '../../models/photo_record.dart';
+import '../../models/photo.dart';
+import '../../services/api_service.dart';
 import '../../state/photo_controller.dart';
 
 class HistoryScreen extends ConsumerWidget {
@@ -11,49 +12,69 @@ class HistoryScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(photoControllerProvider);
-    final controller = ref.read(photoControllerProvider.notifier);
     final items = state.items;
     final formatter = DateFormat('yyyy-MM-dd HH:mm');
+    final apiService = ref.read(apiServiceProvider);
+    final isLoading = state.isLoading;
+    final errorMessage = state.errorMessage;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('History'),
-        actions: [
-          IconButton(
-            tooltip: 'Add dummy',
-            icon: const Icon(Icons.add),
-            onPressed: controller.addDummy,
-          ),
-        ],
       ),
       body: SafeArea(
-        child: items.isEmpty
-            ? const _EmptyState(label: 'No detections yet.')
-            : ListView.separated(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-                itemCount: items.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 10),
-                itemBuilder: (context, index) {
-                  final item = items[index];
-                  return _HistoryCard(
-                    item: item,
-                    timestamp: formatter.format(item.createdAt.toLocal()),
-                    onTap: () => _showModal(context, item),
-                  );
-                },
+        child: Column(
+          children: [
+            if (errorMessage != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                child: Text(
+                  errorMessage,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: const Color(0xFFB91C1C),
+                      ),
+                ),
               ),
+            Expanded(
+              child: isLoading && items.isEmpty
+                  ? const Center(child: CircularProgressIndicator())
+                  : items.isEmpty
+                      ? const _EmptyState(label: 'No detections yet.')
+                      : ListView.separated(
+                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                          itemCount: items.length,
+                          separatorBuilder: (_, __) =>
+                              const SizedBox(height: 10),
+                          itemBuilder: (context, index) {
+                            final item = items[index];
+                            final imageUrl = apiService.resolveImageUrl(
+                              item.imageUrl,
+                            );
+                            return _HistoryCard(
+                              item: item,
+                              imageUrl: imageUrl,
+                              timestamp:
+                                  formatter.format(item.receivedAt.toLocal()),
+                              onTap: () =>
+                                  _showModal(context, item, imageUrl),
+                            );
+                          },
+                        ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  void _showModal(BuildContext context, PhotoRecord item) {
+  void _showModal(BuildContext context, Photo item, String imageUrl) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      builder: (_) => _PhotoModal(item: item),
+      builder: (_) => _PhotoModal(item: item, imageUrl: imageUrl),
     );
   }
 }
@@ -61,17 +82,31 @@ class HistoryScreen extends ConsumerWidget {
 class _HistoryCard extends StatelessWidget {
   const _HistoryCard({
     required this.item,
+    required this.imageUrl,
     required this.timestamp,
     required this.onTap,
   });
 
-  final PhotoRecord item;
+  final Photo item;
+  final String imageUrl;
   final String timestamp;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final resolvedUrl = imageUrl;
+    final isNetwork =
+        resolvedUrl.startsWith('http://') || resolvedUrl.startsWith('https://');
+
+    String positionText() {
+      final x = item.x;
+      final y = item.y;
+      if (x == null || y == null) {
+        return 'Position unknown';
+      }
+      return 'x ${x.toStringAsFixed(1)}, y ${y.toStringAsFixed(1)}';
+    }
 
     return InkWell(
       borderRadius: BorderRadius.circular(16),
@@ -84,15 +119,15 @@ class _HistoryCard extends StatelessWidget {
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(12),
-                child: item.imageUrl.startsWith('http')
+                child: isNetwork
                     ? Image.network(
-                        item.imageUrl,
+                        resolvedUrl,
                         width: 64,
                         height: 64,
                         fit: BoxFit.cover,
                       )
                     : Image.asset(
-                        item.imageUrl,
+                        resolvedUrl,
                         width: 64,
                         height: 64,
                         fit: BoxFit.cover,
@@ -111,7 +146,7 @@ class _HistoryCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Cell ${item.cellRow}, ${item.cellCol}',
+                      positionText(),
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: const Color(0xFF64748B),
                       ),
@@ -162,13 +197,26 @@ class _EmptyState extends StatelessWidget {
 }
 
 class _PhotoModal extends StatelessWidget {
-  const _PhotoModal({required this.item});
-  final PhotoRecord item;
+  const _PhotoModal({required this.item, required this.imageUrl});
+  final Photo item;
+  final String imageUrl;
 
   @override
   Widget build(BuildContext context) {
     final formatter = DateFormat('yyyy-MM-dd HH:mm:ss');
     final theme = Theme.of(context);
+    final resolvedUrl = imageUrl;
+    final isNetwork =
+        resolvedUrl.startsWith('http://') || resolvedUrl.startsWith('https://');
+
+    String positionLabel() {
+      final x = item.x;
+      final y = item.y;
+      if (x == null || y == null) {
+        return 'Unknown';
+      }
+      return '${x.toStringAsFixed(1)}, ${y.toStringAsFixed(1)}';
+    }
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
@@ -204,15 +252,15 @@ class _PhotoModal extends StatelessWidget {
           ),
           ClipRRect(
             borderRadius: BorderRadius.circular(16),
-            child: item.imageUrl.startsWith('http')
+            child: isNetwork
                 ? Image.network(
-                    item.imageUrl,
+                    resolvedUrl,
                     height: 220,
                     width: double.infinity,
                     fit: BoxFit.cover,
                   )
                 : Image.asset(
-                    item.imageUrl,
+                    resolvedUrl,
                     height: 220,
                     width: double.infinity,
                     fit: BoxFit.cover,
@@ -225,12 +273,12 @@ class _PhotoModal extends StatelessWidget {
             children: [
               _DetailChip(label: 'ID', value: '#${item.id}'),
               _DetailChip(
-                label: 'Cell',
-                value: '${item.cellRow}, ${item.cellCol}',
+                label: 'Position',
+                value: positionLabel(),
               ),
               _DetailChip(
                 label: 'Time',
-                value: formatter.format(item.createdAt.toLocal()),
+                value: formatter.format(item.receivedAt.toLocal()),
               ),
             ],
           ),

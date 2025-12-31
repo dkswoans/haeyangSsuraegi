@@ -5,7 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
-import '../../models/photo_record.dart';
+import '../../models/photo.dart';
+import '../../services/api_service.dart';
 import '../../state/photo_controller.dart';
 import 'history_screen.dart';
 
@@ -21,9 +22,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final photos = ref.watch(photoControllerProvider).items;
+    final photoState = ref.watch(photoControllerProvider);
+    final photos = photoState.items;
     final latest = ref.read(photoControllerProvider.notifier).latest();
     final formatter = DateFormat('MM/dd HH:mm');
+    final theme = Theme.of(context);
+    final errorMessage = photoState.errorMessage;
+    final isLoading = photoState.isLoading;
 
     return Scaffold(
       appBar: PreferredSize(
@@ -85,6 +90,16 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             child: Column(
               children: [
                 const SizedBox(height: 10),
+                if (errorMessage != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Text(
+                      errorMessage,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: const Color(0xFFB91C1C),
+                      ),
+                    ),
+                  ),
                 _MetricsRow(
                   total: photos.length,
                   latest: latest,
@@ -95,6 +110,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   child: _TankSection(
                     items: photos,
                     showGrid: showGrid,
+                    isLoading: isLoading,
                     onToggleGrid: () => setState(() => showGrid = !showGrid),
                     onSelect: (item) => _showPhotoModal(context, item),
                   ),
@@ -102,9 +118,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 const SizedBox(height: 20),
 
                 _ActionRow(
-                  onLatest: latest == null
-                      ? null
-                      : () => _showPhotoModal(context, latest),
+                  onLatest: () => _showLatestModal(context, latest),
                   onHistory: _openHistory,
                 ),
                 const SizedBox(height: 20),
@@ -122,7 +136,26 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     ).push(MaterialPageRoute(builder: (_) => const HistoryScreen()));
   }
 
-  void _showPhotoModal(BuildContext context, PhotoRecord item) {
+  void _showLatestModal(BuildContext context, Photo? item) {
+    if (item == null) {
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.white,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        builder: (_) => const _EmptyPhotoModal(),
+      );
+      return;
+    }
+    _showPhotoModal(context, item);
+  }
+
+  void _showPhotoModal(BuildContext context, Photo item) {
+    final imageUrl = ref
+        .read(apiServiceProvider)
+        .resolveImageUrl(item.imageUrl);
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -130,7 +163,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (_) => _PhotoModal(item: item),
+      builder: (_) => _PhotoModal(item: item, imageUrl: imageUrl),
     );
   }
 }
@@ -143,14 +176,14 @@ class _MetricsRow extends StatelessWidget {
   });
 
   final int total;
-  final PhotoRecord? latest;
+  final Photo? latest;
   final DateFormat formatter;
 
   @override
   Widget build(BuildContext context) {
     final latestText = latest == null
         ? '데이터 없음'
-        : formatter.format(latest!.createdAt.toLocal());
+        : formatter.format(latest!.receivedAt.toLocal());
     return Row(
       children: [
         Expanded(
@@ -238,21 +271,19 @@ class _TankSection extends StatelessWidget {
   const _TankSection({
     required this.items,
     required this.showGrid,
+    required this.isLoading,
     required this.onToggleGrid,
     required this.onSelect,
   });
 
-  final List<PhotoRecord> items;
+  final List<Photo> items;
   final bool showGrid;
+  final bool isLoading;
   final VoidCallback onToggleGrid;
-  final ValueChanged<PhotoRecord> onSelect;
+  final ValueChanged<Photo> onSelect;
 
   @override
   Widget build(BuildContext context) {
-    final titleStyle = Theme.of(
-      context,
-    ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700);
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -271,6 +302,12 @@ class _TankSection extends StatelessWidget {
                   ),
                 ),
               ),
+              if (isLoading && items.isEmpty)
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: Center(child: CircularProgressIndicator()),
+                  ),
+                ),
               Positioned(
                 top: 10,
                 right: 10,
@@ -344,6 +381,20 @@ class TankViewport extends StatelessWidget {
   }
 }
 
+const double _tankWidthCm = 60.0;
+const double _tankHeightCm = 20.0;
+
+Offset _tankOffset(Photo item, Size size) {
+  final x = item.x!;
+  final y = item.y!;
+  final px = (x / _tankWidthCm) * size.width;
+  final py = (y / _tankHeightCm) * size.height;
+  return Offset(
+    px.clamp(0.0, size.width).toDouble(),
+    py.clamp(0.0, size.height).toDouble(),
+  );
+}
+
 class _TankMap extends StatelessWidget {
   const _TankMap({
     required this.items,
@@ -351,32 +402,32 @@ class _TankMap extends StatelessWidget {
     required this.onSelect,
   });
 
-  final List<PhotoRecord> items;
+  final List<Photo> items;
   final bool showGrid;
-  final ValueChanged<PhotoRecord> onSelect;
+  final ValueChanged<Photo> onSelect;
 
   static const gridRows = 6;
   static const gridCols = 18;
 
   @override
   Widget build(BuildContext context) {
+    final visibleItems =
+        items.where((item) => item.x != null && item.y != null).toList();
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       child: CustomPaint(
         painter: _TankPainter(
-          items: items,
+          items: visibleItems,
           showGrid: showGrid,
           rows: gridRows,
           cols: gridCols,
         ),
         child: Stack(
           children: [
-            for (final item in items)
+            for (final item in visibleItems)
               Positioned.fill(
                 child: _TapRegion(
                   item: item,
-                  rows: gridRows,
-                  cols: gridCols,
                   onTap: () => onSelect(item),
                 ),
               ),
@@ -395,7 +446,7 @@ class _TankPainter extends CustomPainter {
     required this.cols,
   });
 
-  final List<PhotoRecord> items;
+  final List<Photo> items;
   final bool showGrid;
   final int rows;
   final int cols;
@@ -452,8 +503,9 @@ class _TankPainter extends CustomPainter {
     const minSize = 8.0;
     const maxSize = 16.0;
     for (final item in items) {
-      final x = ((item.cellCol + 0.5) / cols) * size.width;
-      final y = ((item.cellRow + 0.5) / rows) * size.height;
+      final offset = _tankOffset(item, size);
+      final x = offset.dx;
+      final y = offset.dy;
       const conf = 0.7;
       final radius = (lerpDouble(minSize, maxSize, conf) ?? minSize) / 2;
       final paint = Paint()
@@ -477,22 +529,22 @@ class _TankPainter extends CustomPainter {
 class _TapRegion extends StatelessWidget {
   const _TapRegion({
     required this.item,
-    required this.rows,
-    required this.cols,
     required this.onTap,
   });
 
-  final PhotoRecord item;
-  final int rows;
-  final int cols;
+  final Photo item;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final x = ((item.cellCol + 0.5) / cols) * constraints.maxWidth;
-        final y = ((item.cellRow + 0.5) / rows) * constraints.maxHeight;
+        final offset = _tankOffset(
+          item,
+          Size(constraints.maxWidth, constraints.maxHeight),
+        );
+        final x = offset.dx;
+        final y = offset.dy;
         return Stack(
           children: [
             Positioned(
@@ -553,13 +605,26 @@ class _ActionRow extends StatelessWidget {
 }
 
 class _PhotoModal extends StatelessWidget {
-  const _PhotoModal({required this.item});
-  final PhotoRecord item;
+  const _PhotoModal({required this.item, required this.imageUrl});
+  final Photo item;
+  final String imageUrl;
 
   @override
   Widget build(BuildContext context) {
     final formatter = DateFormat('yyyy-MM-dd HH:mm:ss');
     final theme = Theme.of(context);
+    final resolvedUrl = imageUrl;
+    final isNetwork =
+        resolvedUrl.startsWith('http://') || resolvedUrl.startsWith('https://');
+
+    String positionLabel() {
+      final x = item.x;
+      final y = item.y;
+      if (x == null || y == null) {
+        return 'Unknown';
+      }
+      return '${x.toStringAsFixed(1)}, ${y.toStringAsFixed(1)}';
+    }
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
@@ -595,15 +660,15 @@ class _PhotoModal extends StatelessWidget {
           ),
           ClipRRect(
             borderRadius: BorderRadius.circular(16),
-            child: item.imageUrl.startsWith('http')
+            child: isNetwork
                 ? Image.network(
-                    item.imageUrl,
+                    resolvedUrl,
                     height: 220,
                     width: double.infinity,
                     fit: BoxFit.cover,
                   )
                 : Image.asset(
-                    item.imageUrl,
+                    resolvedUrl,
                     height: 220,
                     width: double.infinity,
                     fit: BoxFit.cover,
@@ -617,11 +682,11 @@ class _PhotoModal extends StatelessWidget {
               _DetailChip(label: 'ID', value: '#${item.id}'),
               _DetailChip(
                 label: '셀 위치',
-                value: '${item.cellRow}, ${item.cellCol}',
+                value: positionLabel(),
               ),
               _DetailChip(
                 label: '시간',
-                value: formatter.format(item.createdAt.toLocal()),
+                value: formatter.format(item.receivedAt.toLocal()),
               ),
             ],
           ),
@@ -631,6 +696,56 @@ class _PhotoModal extends StatelessWidget {
             child: ElevatedButton(
               onPressed: () => Navigator.pop(context),
               child: const Text('닫기'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EmptyPhotoModal extends StatelessWidget {
+  const _EmptyPhotoModal();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: const Color(0xFFE2E8F0),
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'No photos uploaded yet.',
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Please check back after a new upload.',
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: const Color(0xFF64748B),
+            ),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Close'),
             ),
           ),
         ],
